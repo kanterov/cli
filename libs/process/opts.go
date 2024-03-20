@@ -37,6 +37,13 @@ func WithDir(dir string) execOption {
 	}
 }
 
+func WithStdinPipe(src io.Reader) execOption {
+	return func(_ context.Context, c *exec.Cmd) error {
+		c.Stdin = src
+		return nil
+	}
+}
+
 func WithStdoutPipe(dst *io.ReadCloser) execOption {
 	return func(_ context.Context, c *exec.Cmd) error {
 		outPipe, err := c.StdoutPipe()

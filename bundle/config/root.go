@@ -61,6 +61,7 @@ type Root struct {
 	// Permissions section allows to define permissions which will be
 	// applied to all resources defined in bundle
 	Permissions []resources.Permission `json:"permissions,omitempty"`
+	Python      *Python                `json:"python,omitempty"`
 }
 
 // Load loads the bundle configuration file at the specified path.

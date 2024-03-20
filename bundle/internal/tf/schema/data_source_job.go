@@ -419,8 +419,8 @@ type DataSourceJobJobSettingsSettingsNotificationSettings struct {
 }
 
 type DataSourceJobJobSettingsSettingsParameter struct {
-	Default string `json:"default,omitempty"`
-	Name    string `json:"name,omitempty"`
+	Default string `json:"default"`
+	Name    string `json:"name"`
 }
 
 type DataSourceJobJobSettingsSettingsPipelineTask struct {

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "test_project"
+dynamic = [
+    "dependencies",
+    "version",
+]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

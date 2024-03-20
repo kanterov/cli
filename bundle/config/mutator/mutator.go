@@ -13,6 +13,7 @@ func DefaultMutators() []bundle.Mutator {
 		InitializeVariables(),
 		DefineDefaultTarget(),
 		LoadGitDetails(),
+		PythonMutator("pre-initialize"),
 	}
 }
 
