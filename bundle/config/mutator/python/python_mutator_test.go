@@ -79,26 +79,32 @@ func TestPythonMutator_loadResources(t *testing.T) {
 			"load_resources",
 		},
 		`{
-			"experimental": {
-				"python": {
-					"resources": ["resources:load_resources"],
-					"venv_path": ".venv"
-				}
-			},
-			"resources": {
-				"jobs": {
-					"job0": {
-						name: "job_0"
-					},
-					"job1": {
-						name: "job_1"
-					},
-				}
-			}
-		}`,
+            "experimental": {
+                "python": {
+                    "resources": ["resources:load_resources"],
+                    "venv_path": ".venv"
+                }
+            },
+            "resources": {
+                "jobs": {
+                    "job0": {
+                        name: "job_0"
+                    },
+                    "job1": {
+                        name: "job_1"
+                    },
+                },
+                "pipelines": {
+                    "pipeline0": {
+                        name: "pipeline_0"
+                    },
+                }
+            }
+        }`,
 		`{"severity": "warning", "summary": "job doesn't have any tasks", "location": {"file": "src/examples/file.py", "line": 10, "column": 5}}`,
 		`{"path": "resources.jobs.job0", "file": "src/examples/job0.py", "line": 3, "column": 5}
-		{"path": "resources.jobs.job1", "file": "src/examples/job1.py", "line": 5, "column": 7}`,
+        {"path": "resources.jobs.job1", "file": "src/examples/job1.py", "line": 5, "column": 7}
+        {"path": "resources.pipelines.pipeline0", "file": "src/examples/pipeline0.py", "line": 7, "column": 9}`,
 	)
 
 	mutator := PythonMutator(PythonMutatorPhaseLoadResources)
@@ -116,20 +122,42 @@ func TestPythonMutator_loadResources(t *testing.T) {
 		assert.Equal(t, "job_1", job1.Name)
 	}
 
+	if pipeline0, ok := b.Config.Resources.Jobs["pipeline0"]; ok {
+		assert.Equal(t, "pipeline_0", pipeline0.Name)
+	}
+
 	// output of locations.json should be applied to underlying dyn.Value
 	err := b.Config.Mutate(func(v dyn.Value) (dyn.Value, error) {
-		name1, err := dyn.GetByPath(v, dyn.MustPathFromString("resources.jobs.job1.name"))
-		if err != nil {
-			return dyn.InvalidValue, err
-		}
+		// location is databricks.yml, because output contains resource as-is
+		jobName0, err := dyn.GetByPath(v, dyn.MustPathFromString("resources.jobs.job0.name"))
+		require.NoError(t, err)
+		assert.Equal(t, []dyn.Location{
+			{
+				File:   filepath.Join(rootPath, "databricks.yml"),
+				Line:   9,
+				Column: 19,
+			},
+		}, jobName0.Locations())
 
+		jobName1, err := dyn.GetByPath(v, dyn.MustPathFromString("resources.jobs.job1.name"))
+		require.NoError(t, err)
 		assert.Equal(t, []dyn.Location{
 			{
 				File:   filepath.Join(rootPath, "src/examples/job1.py"),
 				Line:   5,
 				Column: 7,
 			},
-		}, name1.Locations())
+		}, jobName1.Locations())
+
+		pipelineName0, err := dyn.GetByPath(v, dyn.MustPathFromString("resources.pipelines.pipeline0.name"))
+		require.NoError(t, err)
+		assert.Equal(t, []dyn.Location{
+			{
+				File:   filepath.Join(rootPath, "src/examples/pipeline0.py"),
+				Line:   7,
+				Column: 9,
+			},
+		}, pipelineName0.Locations())
 
 		return v, nil
 	})
@@ -168,21 +196,21 @@ func TestPythonMutator_loadResources_disallowed(t *testing.T) {
 			"load_resources",
 		},
 		`{
-			"experimental": {
-				"python": {
-					"resources": ["resources:load_resources"],
-					"venv_path": ".venv"
-				}
-			},
-			"resources": {
-				"jobs": {
-					"job0": {
-						name: "job_0",
-						description: "job description"
-					}
-				}
-			}
-		}`, "", "")
+            "experimental": {
+                "python": {
+                    "resources": ["resources:load_resources"],
+                    "venv_path": ".venv"
+                }
+            },
+            "resources": {
+                "jobs": {
+                    "job0": {
+                        name: "job_0",
+                        description: "job description"
+                    }
+                }
+            }
+        }`, "", "")
 
 	mutator := PythonMutator(PythonMutatorPhaseLoadResources)
 	diag := bundle.Apply(ctx, b, mutator)
@@ -213,21 +241,21 @@ func TestPythonMutator_applyMutators(t *testing.T) {
 			"apply_mutators",
 		},
 		`{
-			"experimental": {
-				"python": {
-					"venv_path": ".venv",
-					"mutators": ["mutators:add_description"]
-				}
-			},
-			"resources": {
-				"jobs": {
-					"job0": {
-						name: "job_0",
-						description: "my job"
-					}
-				}
-			}
-		}`, "", "")
+            "experimental": {
+                "python": {
+                    "venv_path": ".venv",
+                    "mutators": ["mutators:add_description"]
+                }
+            },
+            "resources": {
+                "jobs": {
+                    "job0": {
+                        name: "job_0",
+                        description: "my job"
+                    }
+                }
+            }
+        }`, "", "")
 
 	mutator := PythonMutator(PythonMutatorPhaseApplyMutators)
 	diag := bundle.Apply(ctx, b, mutator)
@@ -281,14 +309,14 @@ func TestPythonMutator_badOutput(t *testing.T) {
 			"load_resources",
 		},
 		`{
-			"resources": {
-				"jobs": {
-					"job0": {
-						unknown_property: "my job"
-					}
-				}
-			}
-		}`, "", "")
+            "resources": {
+                "jobs": {
+                    "job0": {
+                        unknown_property: "my job"
+                    }
+                }
+            }
+        }`, "", "")
 
 	mutator := PythonMutator(PythonMutatorPhaseLoadResources)
 	diag := bundle.Apply(ctx, b, mutator)
@@ -390,10 +418,26 @@ func TestCreateOverrideVisitor(t *testing.T) {
 			updateError: errors.New("unexpected change at \"resources.jobs.job0.name\" (update)"),
 		},
 		{
+			name:        "load_resources: can't change an existing pipeline",
+			phase:       PythonMutatorPhaseLoadResources,
+			updatePath:  dyn.MustPathFromString("resources.pipelines.pipeline0.name"),
+			deletePath:  dyn.MustPathFromString("resources.pipelines.pipeline0.name"),
+			insertPath:  dyn.MustPathFromString("resources.pipelines.pipeline0.name"),
+			deleteError: errors.New("unexpected change at \"resources.pipelines.pipeline0.name\" (delete)"),
+			insertError: errors.New("unexpected change at \"resources.pipelines.pipeline0.name\" (insert)"),
+			updateError: errors.New("unexpected change at \"resources.pipelines.pipeline0.name\" (update)"),
+		},
+		{
 			name:        "load_resources: can't delete an existing job",
 			phase:       PythonMutatorPhaseLoadResources,
 			deletePath:  dyn.MustPathFromString("resources.jobs.job0"),
 			deleteError: errors.New("unexpected change at \"resources.jobs.job0\" (delete)"),
+		},
+		{
+			name:        "load_resources: can't delete an existing pipeline",
+			phase:       PythonMutatorPhaseLoadResources,
+			deletePath:  dyn.MustPathFromString("resources.pipelines.pipeline0"),
+			deleteError: errors.New("unexpected change at \"resources.pipelines.pipeline0\" (delete)"),
 		},
 		{
 			name:        "load_resources: can insert 'resources'",
@@ -408,9 +452,21 @@ func TestCreateOverrideVisitor(t *testing.T) {
 			insertError: nil,
 		},
 		{
+			name:        "load_resources: can insert 'resources.pipelines'",
+			phase:       PythonMutatorPhaseLoadResources,
+			insertPath:  dyn.MustPathFromString("resources.pipelines"),
+			insertError: nil,
+		},
+		{
 			name:        "load_resources: can insert a job",
 			phase:       PythonMutatorPhaseLoadResources,
 			insertPath:  dyn.MustPathFromString("resources.jobs.job0"),
+			insertError: nil,
+		},
+		{
+			name:        "load_resources: can insert a pipeline",
+			phase:       PythonMutatorPhaseLoadResources,
+			insertPath:  dyn.MustPathFromString("resources.pipelines.pipeline0"),
 			insertError: nil,
 		},
 		{
@@ -474,6 +530,12 @@ func TestCreateOverrideVisitor(t *testing.T) {
 			deleteError: errors.New("unexpected change at \"resources.jobs.job0\" (delete)"),
 		},
 		{
+			name:        "apply_mutators: can't delete an existing pipeline",
+			phase:       PythonMutatorPhaseInit,
+			deletePath:  dyn.MustPathFromString("resources.pipelines.pipeline0"),
+			deleteError: errors.New("unexpected change at \"resources.pipelines.pipeline0\" (delete)"),
+		},
+		{
 			name:        "apply_mutators: can insert 'resources'",
 			phase:       PythonMutatorPhaseApplyMutators,
 			insertPath:  dyn.MustPathFromString("resources"),
@@ -486,10 +548,22 @@ func TestCreateOverrideVisitor(t *testing.T) {
 			insertError: nil,
 		},
 		{
+			name:        "apply_mutators: can insert 'resources.pipelines'",
+			phase:       PythonMutatorPhaseApplyMutators,
+			insertPath:  dyn.MustPathFromString("resources.pipelines"),
+			insertError: nil,
+		},
+		{
 			name:        "apply_mutators: can't insert a job",
 			phase:       PythonMutatorPhaseApplyMutators,
 			insertPath:  dyn.MustPathFromString("resources.jobs.job0"),
 			insertError: errors.New("unexpected change at \"resources.jobs.job0\" (insert)"),
+		},
+		{
+			name:        "apply_mutators: can't insert a pipeline",
+			phase:       PythonMutatorPhaseApplyMutators,
+			insertPath:  dyn.MustPathFromString("resources.pipelines.pipeline0"),
+			insertError: errors.New("unexpected change at \"resources.pipelines.pipeline0\" (insert)"),
 		},
 		{
 			name:        "apply_mutators: can't change include",
